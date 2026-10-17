@@ -16,11 +16,32 @@ respects both, so a burst of calls waits locally instead of collecting 429s.
 ## Usage
 
 ```python
+import time
 from llm_limiter import Limiter, Gateway
 
-gateway = Gateway(provider, Limiter(rpm=60, tpm=40_000))
+gateway = Gateway(provider, Limiter(rpm=60, tpm=40_000, clock=time.monotonic))
 response = gateway.complete(request)
 ```
+
+`provider` is anything with `complete(request) -> Response`; raise
+`ProviderError(message, status, retry_after)` from it to opt into retries.
+
+## Simulation
+
+```
+PYTHONPATH=. python3 examples/simulate.py
+```
+
+Runs 20 scripted calls (about 800 estimated tokens, 450 actual) through a
+30 rpm / 4000 tpm limiter on a virtual clock. Output on that fixture: the
+last call is sent at t=80.25s. Settling to actual usage is what keeps the
+spacing near 6.75s instead of the ~12s the raw estimates would imply.
+
+## Limits
+
+- Token estimation is a 4-chars-per-token heuristic; real usage corrects it.
+- A call larger than the whole TPM budget raises instead of waiting forever.
+- One process only: the buckets are not shared across workers.
 
 ## Validate
 
