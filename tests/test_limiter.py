@@ -1,3 +1,4 @@
+import threading
 import unittest
 
 from llm_limiter.limiter import Limiter
@@ -36,6 +37,27 @@ class LimiterTest(unittest.TestCase):
         reservation = self.limiter.reserve(6000)
         self.limiter.release(reservation)
         self.assertEqual(self.limiter.wait_time(6000), 0.0)
+
+    def test_try_reserve_returns_wait_when_full(self) -> None:
+        self.limiter.reserve(6000)
+        self.assertAlmostEqual(self.limiter.try_reserve(1000), 10.0)
+
+    def test_concurrent_try_reserve_never_overspends(self) -> None:
+        # Frozen clock: exactly 6 reservations of 1000 fit into 6000 tokens.
+        admitted = []
+        barrier = threading.Barrier(20)
+
+        def worker() -> None:
+            barrier.wait()
+            if not isinstance(self.limiter.try_reserve(1000), float):
+                admitted.append(1)
+
+        threads = [threading.Thread(target=worker) for _ in range(20)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(len(admitted), 6)
 
 
 if __name__ == "__main__":

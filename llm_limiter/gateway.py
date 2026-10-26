@@ -6,7 +6,7 @@ import random
 import time
 from typing import Callable
 
-from .limiter import Limiter
+from .limiter import Limiter, Reservation
 from .provider import Provider, ProviderError, Request, Response
 from .tokens import estimate_tokens
 
@@ -36,10 +36,10 @@ class Gateway:
     def complete(self, request: Request) -> Response:
         estimate = estimate_tokens(request.prompt, request.max_output_tokens)
         for attempt in range(1, self._max_attempts + 1):
-            wait = self._limiter.wait_time(estimate)
-            if wait > 0:
-                self._sleep(wait)
-            reservation = self._limiter.reserve(estimate)
+            reservation = self._limiter.try_reserve(estimate)
+            while not isinstance(reservation, Reservation):
+                self._sleep(reservation)
+                reservation = self._limiter.try_reserve(estimate)
             try:
                 response = self._provider.complete(request)
             except ProviderError as error:
