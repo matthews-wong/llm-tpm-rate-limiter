@@ -26,6 +26,21 @@ response = gateway.complete(request)
 `provider` is anything with `complete(request) -> Response`; raise
 `ProviderError(message, status, retry_after)` from it to opt into retries.
 
+## Cost ledger
+
+```python
+from llm_limiter import Ledger
+
+ledger = Ledger(price_per_1k_tokens=0.002)
+gateway = Gateway(provider, limiter, ledger=ledger)
+gateway.complete(request)
+ledger.entries      # estimated/actual tokens, attempts, waited_seconds, cost
+ledger.total_cost
+```
+
+Cost is priced on the provider's reported usage, not the estimate. Failed
+calls are not recorded.
+
 ## Simulation
 
 ```
